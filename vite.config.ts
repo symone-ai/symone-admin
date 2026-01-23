@@ -19,14 +19,11 @@ export default defineConfig(({ mode }) => ({
         },
     },
     build: {
-        outDir: "dist-admin",
+        outDir: "dist",
         rollupOptions: {
             input: {
-                index: path.resolve(__dirname, "admin.html"),
+                index: path.resolve(__dirname, "index.html"),
             },
         },
-    },
-    define: {
-        '__BUILD_TARGET__': JSON.stringify('admin'),
     },
 }));
