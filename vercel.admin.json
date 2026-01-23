@@ -1,0 +1,12 @@
+{
+    "name": "symone-admin-prod",
+    "buildCommand": "npm run build:admin",
+    "outputDirectory": "dist-admin",
+    "framework": "vite",
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}

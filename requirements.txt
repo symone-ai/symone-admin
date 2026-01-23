@@ -1,0 +1,11 @@
+mcp
+slack_sdk
+pydantic
+python-dotenv
+httpx
+fastapi
+uvicorn
+sse-starlette
+requests
+supabase
+
