@@ -55,6 +55,8 @@ export interface TeamMember {
   id: string;
   userId: string;
   name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   role: 'owner' | 'admin' | 'member' | 'viewer';
   avatar: string;

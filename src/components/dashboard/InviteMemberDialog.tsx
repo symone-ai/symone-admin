@@ -18,7 +18,8 @@ const roles: { value: TeamMember['role']; label: string; description: string }[]
 
 export const InviteMemberDialog = ({ open, onOpenChange }: InviteMemberDialogProps) => {
   const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<TeamMember['role']>('member');
   const [selectedServers, setSelectedServers] = useState<string[]>([]);
 
@@ -26,12 +27,14 @@ export const InviteMemberDialog = ({ open, onOpenChange }: InviteMemberDialogPro
   const inviteMember = useInviteTeamMember();
 
   const handleSubmit = async () => {
-    if (!email.trim() || !name.trim()) return;
+    if (!email.trim() || !firstName.trim()) return;
 
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const initials = (firstName[0] || '' + lastName[0] || '').toUpperCase();
 
     await inviteMember.mutateAsync({
-      name,
+      name: `${firstName} ${lastName}`.trim(),
+      firstName: firstName,
+      lastName: lastName,
       email,
       role,
       avatar: initials,
@@ -40,14 +43,15 @@ export const InviteMemberDialog = ({ open, onOpenChange }: InviteMemberDialogPro
 
     // Reset and close
     setEmail('');
-    setName('');
+    setFirstName('');
+    setLastName('');
     setRole('member');
     setSelectedServers([]);
     onOpenChange(false);
   };
 
   const toggleServer = (id: string) => {
-    setSelectedServers(prev => 
+    setSelectedServers(prev =>
       prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
     );
   };
@@ -63,15 +67,27 @@ export const InviteMemberDialog = ({ open, onOpenChange }: InviteMemberDialogPro
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Full Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Jane Smith"
-              className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">First Name</label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Jane"
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Last Name</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Smith"
+                className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
           </div>
 
           <div>
@@ -96,11 +112,10 @@ export const InviteMemberDialog = ({ open, onOpenChange }: InviteMemberDialogPro
                   key={r.value}
                   type="button"
                   onClick={() => setRole(r.value)}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
-                    role === r.value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  }`}
+                  className={`p-3 rounded-lg border text-left transition-colors ${role === r.value
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                    }`}
                 >
                   <p className="font-medium text-foreground text-sm">{r.label}</p>
                   <p className="text-xs text-muted-foreground">{r.description}</p>
@@ -117,11 +132,10 @@ export const InviteMemberDialog = ({ open, onOpenChange }: InviteMemberDialogPro
                   key={server.id}
                   type="button"
                   onClick={() => toggleServer(server.id)}
-                  className={`p-2 rounded-lg border text-left text-sm transition-colors ${
-                    selectedServers.includes(server.id)
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  }`}
+                  className={`p-2 rounded-lg border text-left text-sm transition-colors ${selectedServers.includes(server.id)
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                    }`}
                 >
                   {server.name}
                 </button>
@@ -133,10 +147,10 @@ export const InviteMemberDialog = ({ open, onOpenChange }: InviteMemberDialogPro
             <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
               Cancel
             </Button>
-            <Button 
-              variant="hero" 
+            <Button
+              variant="hero"
               onClick={handleSubmit}
-              disabled={!email.trim() || !name.trim() || inviteMember.isPending}
+              disabled={!email.trim() || !firstName.trim() || inviteMember.isPending}
               className="flex-1"
             >
               {inviteMember.isPending ? 'Sending...' : 'Send Invite'}

@@ -329,6 +329,8 @@ export interface PlatformUser {
   id: string;
   email: string;
   name: string;
+  first_name?: string;
+  last_name?: string;
   avatar_url: string | null;
   active: boolean;
   email_verified: boolean;
@@ -351,6 +353,8 @@ export interface TeamMember {
   joined_at?: string;
   email: string;
   name?: string;
+  first_name?: string;
+  last_name?: string;
   avatar_url?: string | null;
   active?: boolean;
   last_login_at?: string | null;
@@ -631,7 +635,7 @@ export interface MarketplaceMCP {
   status: 'planned' | 'active' | 'pending' | 'rejected' | 'deprecated';
   version: string;
   icon: string;
-  installs: number;
+  install_count: number;
   rating: number;
   is_featured: boolean;
   verified: boolean;
@@ -974,11 +978,16 @@ export const user = {
     return data;
   },
 
-  signup: async (email: string, password: string, name: string) => {
+  signup: async (email: string, password: string, firstName: string, lastName: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName
+      }),
     });
     const data = await response.json();
     if (!response.ok) {
