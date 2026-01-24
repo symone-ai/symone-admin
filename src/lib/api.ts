@@ -5,7 +5,7 @@
  * Configure VITE_API_URL in .env for production.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://symone-gateway-196867632933.us-central1.run.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://symone-gateway-jkywi4mtla-uc.a.run.app';
 
 // Storage keys
 const ADMIN_TOKEN_KEY = 'symone_admin_token';
