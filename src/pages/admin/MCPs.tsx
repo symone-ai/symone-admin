@@ -318,7 +318,7 @@ export default function AdminMCPs() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Installs</p>
-                <p className="text-2xl font-bold">{stats?.total_installs || mcps.reduce((sum, m) => sum + m.installs, 0).toLocaleString()}</p>
+                <p className="text-2xl font-bold">{stats?.total_installs || mcps.reduce((sum, m) => sum + m.install_count, 0).toLocaleString()}</p>
               </div>
               <Download className="h-8 w-8 text-blue-500 opacity-50" />
             </div>
@@ -575,7 +575,7 @@ export default function AdminMCPs() {
                         {mcp.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">{mcp.installs.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{mcp.install_count.toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       {mcp.rating > 0 ? (
                         <div className="flex items-center justify-end gap-1">
