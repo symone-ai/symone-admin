@@ -27,6 +27,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -49,6 +59,7 @@ export default function AdminPlans() {
   const [plans, setPlans] = useState<PlanWithMetrics[]>([]);
   const [editingPlan, setEditingPlan] = useState<PlanWithMetrics | null>(null);
   const [creatingPlan, setCreatingPlan] = useState(false);
+  const [deletingPlan, setDeletingPlan] = useState<{id: string, name: string} | null>(null);
   const [newPlan, setNewPlan] = useState({
     name: '',
     slug: '',
@@ -148,17 +159,20 @@ export default function AdminPlans() {
     }
   };
 
-  const deletePlan = async (planId: string, planName: string) => {
-    if (!confirm(`Are you sure you want to delete ${planName}? This cannot be undone.`)) {
-      return;
-    }
+  const deletePlan = (planId: string, planName: string) => {
+    setDeletingPlan({id: planId, name: planName});
+  };
+
+  const confirmDeletePlan = async () => {
+    if (!deletingPlan) return;
 
     try {
-      await api.plans.delete(planId);
+      await api.plans.delete(deletingPlan.id);
       toast({
         title: 'Plan deleted',
-        description: `${planName} has been deleted`
+        description: `${deletingPlan.name} has been deleted`
       });
+      setDeletingPlan(null);
       loadPlans();
     } catch (error: any) {
       toast({
@@ -505,6 +519,24 @@ export default function AdminPlans() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Plan Confirmation Dialog */}
+      <AlertDialog open={!!deletingPlan} onOpenChange={() => setDeletingPlan(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Plan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {deletingPlan?.name}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeletePlan} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

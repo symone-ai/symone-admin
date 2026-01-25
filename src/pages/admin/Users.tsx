@@ -95,6 +95,9 @@ export default function AdminUsers() {
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
   const [loadingMembers, setLoadingMembers] = useState<string | null>(null);
+  const [addingMemberToTeam, setAddingMemberToTeam] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [memberRole, setMemberRole] = useState<'owner' | 'admin' | 'member' | 'viewer'>('member');
 
   // Users state
   const [users, setUsers] = useState<PlatformUser[]>([]);
@@ -255,6 +258,7 @@ export default function AdminUsers() {
 
     try {
       await api.teams.update(editingTeam.id, {
+        name: editingTeam.name,
         plan: editingTeam.plan,
         quota_limit: editingTeam.quota_limit,
         active: editingTeam.active
@@ -357,6 +361,39 @@ export default function AdminUsers() {
         }
       }
     });
+  };
+
+  const addMemberToTeam = async () => {
+    if (!addingMemberToTeam || !selectedUserId) return;
+
+    try {
+      await api.users.addToTeam(addingMemberToTeam, selectedUserId, memberRole);
+
+      toast({
+        title: 'Member added',
+        description: 'User has been added to the team'
+      });
+
+      setAddingMemberToTeam(null);
+      setSelectedUserId('');
+      setMemberRole('member');
+
+      // Refresh team members for the updated team
+      setTeamMembers(prev => {
+        const updated = { ...prev };
+        delete updated[addingMemberToTeam];
+        return updated;
+      });
+      loadTeamMembers(addingMemberToTeam);
+      loadTeams();
+
+    } catch (error: any) {
+      toast({
+        title: 'Error adding member',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
   };
 
   // Get plan quota from plans API instead of hardcoded values
@@ -538,10 +575,23 @@ export default function AdminUsers() {
 
                         <CollapsibleContent>
                           <div className="border-t p-4 bg-muted/30">
-                            <h4 className="font-medium mb-3 flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              Team Members
-                            </h4>
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-medium flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                Team Members
+                              </h4>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAddingMemberToTeam(team.id);
+                                }}
+                              >
+                                <UserPlus className="h-4 w-4 mr-2" />
+                                Add Member
+                              </Button>
+                            </div>
 
                             {loadingMembers === team.id ? (
                               <div className="flex items-center gap-2 text-muted-foreground py-4">
@@ -717,12 +767,21 @@ export default function AdminUsers() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={async () => {
+                                  const newStatus = !user.active;
                                   try {
-                                    await api.users.updateStatus(user.id, !user.active);
-                                    toast({ title: user.active ? 'User disabled' : 'User enabled' });
-                                    loadUsers();
+                                    await api.users.updateStatus(user.id, newStatus);
+                                    toast({
+                                      title: newStatus ? 'User enabled' : 'User disabled',
+                                      description: `${user.email} has been ${newStatus ? 'enabled' : 'disabled'}`
+                                    });
+                                    // Force reload to get fresh data from server
+                                    await loadUsers();
                                   } catch (error: any) {
-                                    toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                                    toast({
+                                      title: 'Error updating user status',
+                                      description: error.message,
+                                      variant: 'destructive'
+                                    });
                                   }
                                 }}
                               >
@@ -818,7 +877,10 @@ export default function AdminUsers() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Team Name</Label>
-                <Input value={editingTeam.name} disabled />
+                <Input
+                  value={editingTeam.name}
+                  onChange={(e) => setEditingTeam({ ...editingTeam, name: e.target.value })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -918,6 +980,62 @@ export default function AdminUsers() {
               }}
             >
               Delete User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Member to Team Dialog */}
+      <Dialog open={!!addingMemberToTeam} onOpenChange={() => setAddingMemberToTeam(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add User to Team</DialogTitle>
+            <DialogDescription>
+              Add an existing user to {teams.find(t => t.id === addingMemberToTeam)?.name || 'this team'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select User</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.filter(u =>
+                    !teamMembers[addingMemberToTeam || '']?.some(m => m.user_id === u.id)
+                  ).map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.email} - {user.first_name} {user.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={memberRole} onValueChange={(value: any) => setMemberRole(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Member</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddingMemberToTeam(null)}>
+              Cancel
+            </Button>
+            <Button onClick={addMemberToTeam} disabled={!selectedUserId}>
+              Add Member
             </Button>
           </DialogFooter>
         </DialogContent>
