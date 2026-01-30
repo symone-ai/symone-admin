@@ -186,7 +186,7 @@ export const auth = {
       success: boolean;
       admin: AdminUser;
       session: AdminSession;
-    }>('/admin/simple-login', {
+    }>('/admin/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -1261,6 +1261,27 @@ export const user = {
 };
 
 // ============================================================================
+// Health Check (Public)
+// ============================================================================
+
+export interface HealthStatus {
+  status: 'healthy' | 'degraded';
+  timestamp: string;
+  database: string;
+  servers_active: number;
+}
+
+export const health = {
+  getStatus: async (): Promise<HealthStatus> => {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return await response.json();
+  }
+};
+
+// ============================================================================
 // Export all
 // ============================================================================
 
@@ -1276,6 +1297,7 @@ export const api = {
   marketplace,
   public: publicApi,
   user,
+  health,
 };
 
 export default api;
