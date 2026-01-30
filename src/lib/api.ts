@@ -91,6 +91,14 @@ export interface ActivityLog {
   timestamp: string;
 }
 
+export interface RequestTrace {
+  id: string;
+  activity_log_id: string;
+  request_payload?: Record<string, any>;
+  response_payload?: Record<string, any>;
+  created_at: string;
+}
+
 // ============================================================================
 // Storage Helpers
 // ============================================================================
@@ -240,6 +248,142 @@ export const analytics = {
       by_plan: Record<string, { mrr: number; arr: number; count: number }>;
       timestamp: string;
     }>('/admin/analytics/revenue');
+    return response;
+  },
+
+  // Cost Attribution & Zombie Detection
+  getUsageCosts: async (days: number = 30, limit: number = 20) => {
+    const response = await request<{
+      success: boolean;
+      period_days: number;
+      total_cost: number;
+      total_requests: number;
+      teams: Array<{
+        team_id: string;
+        team_name: string;
+        request_count: number;
+        total_seconds: number;
+        estimated_cost: number;
+        user_count: number;
+        cost_per_user: number;
+        status: 'healthy' | 'at_risk';
+      }>;
+      calculated_at: string;
+    }>(`/admin/usage/costs?days=${days}&limit=${limit}`);
+    return response;
+  },
+
+  getTeamCost: async (teamId: string, days: number = 30) => {
+    const response = await request<{
+      success: boolean;
+      team_id: string;
+      team_name: string;
+      period_days: number;
+      request_count: number;
+      total_latency_ms: number;
+      total_seconds: number;
+      avg_latency_ms: number;
+      estimated_cost: number;
+      cost_breakdown: {
+        requests: number;
+        compute: number;
+      };
+      success_rate: number;
+      calculated_at: string;
+    }>(`/admin/usage/team/${teamId}/cost?days=${days}`);
+    return response;
+  },
+
+  getZombieUsers: async (days: number = 7, minIdleRatio: number = 300, limit: number = 20) => {
+    const response = await request<{
+      success: boolean;
+      period_days: number;
+      threshold_seconds_per_tool: number;
+      zombies: Array<{
+        team_id: string;
+        team_name: string;
+        user_id?: string;
+        user_email?: string;
+        session_count: number;
+        avg_session_seconds: number;
+        avg_session_hours: number;
+        total_tools: number;
+        avg_tools_per_session: number;
+        idle_ratio?: number;
+        longest_session_seconds: number;
+        longest_session_hours: number;
+      }>;
+      recommendations: string[];
+      calculated_at: string;
+      message?: string;
+    }>(`/admin/usage/zombies?days=${days}&min_idle_ratio=${minIdleRatio}&limit=${limit}`);
+    return response;
+  },
+
+  getActiveConnections: async () => {
+    const response = await request<{
+      success: boolean;
+      active_count: number;
+      connections: Array<{
+        id: string;
+        team_id: string;
+        team_name: string;
+        user_id?: string;
+        connected_at: string;
+        duration_minutes: number;
+        tools_executed: number;
+      }>;
+      message?: string;
+    }>('/admin/usage/active-connections');
+    return response;
+  },
+
+  // Per-User Cost Attribution
+  getUserCost: async (userId: string, days: number = 30) => {
+    const response = await request<{
+      success: boolean;
+      user_id: string;
+      period_days: number;
+      request_count: number;
+      total_latency_ms: number;
+      total_seconds: number;
+      avg_latency_ms: number;
+      estimated_cost: number;
+      cost_breakdown: {
+        requests: number;
+        compute: number;
+      };
+      tools_used: Array<{
+        tool_name: string;
+        count: number;
+      }>;
+      success_rate: number;
+      message?: string;
+    }>(`/admin/usage/user/${userId}/cost?days=${days}`);
+    return response;
+  },
+
+  getTeamUserCosts: async (teamId: string, days: number = 30, limit: number = 20) => {
+    const response = await request<{
+      success: boolean;
+      team_id: string;
+      period_days: number;
+      target_cost_per_user: number;
+      users: Array<{
+        user_id: string;
+        user_email?: string;
+        user_name?: string;
+        request_count: number;
+        total_seconds: number;
+        estimated_cost: number;
+        status: 'healthy' | 'at_risk';
+      }>;
+      unattributed: {
+        request_count: number;
+        estimated_cost: number;
+      };
+      calculated_at?: string;
+    }>(`/admin/usage/team/${teamId}/users?days=${days}&limit=${limit}`);
     return response;
   }
 };
@@ -521,6 +665,15 @@ export const activity = {
       total: number;
     }>(`/admin/activity?${query}`);
     return response.activities;
+  },
+
+  getTrace: async (activityId: string) => {
+    const response = await request<{
+      success: boolean;
+      activity: ActivityLog;
+      trace: RequestTrace | null;
+    }>(`/admin/activity/${activityId}/trace`);
+    return response;
   }
 };
 
@@ -730,6 +883,46 @@ export const marketplace = {
       };
     }>('/admin/marketplace/stats');
     return response.stats;
+  },
+
+  upload: async (file: File, options?: {
+    name?: string;
+    category?: string;
+    website_url?: string;
+    documentation_url?: string;
+  }) => {
+    const token = storage.getAdminToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options?.name) formData.append('name', options.name);
+    if (options?.category) formData.append('category', options.category);
+    if (options?.website_url) formData.append('website_url', options.website_url);
+    if (options?.documentation_url) formData.append('documentation_url', options.documentation_url);
+
+    const response = await fetch(`${API_BASE_URL}/admin/marketplace/upload`, {
+      method: 'POST',
+      headers: {
+        'X-Admin-Token': token || '',
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Upload failed');
+    }
+
+    return data as {
+      success: boolean;
+      message: string;
+      listing: MarketplaceMCP;
+      metadata: {
+        tools_count: number;
+        required_secrets: string[];
+        installed_path: string;
+      };
+    };
   }
 };
 
