@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Plus,
   Search,
@@ -10,7 +10,12 @@ import {
   Server,
   Download,
   Star,
-  Loader2
+  Loader2,
+  Upload,
+  FileArchive,
+  Globe,
+  FileText,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,9 +80,21 @@ export default function AdminMCPs() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [providerFilter, setProviderFilter] = useState<string>('all');
   const [showAddMCP, setShowAddMCP] = useState(false);
+  const [showUploadMCP, setShowUploadMCP] = useState(false);
   const [editingMCP, setEditingMCP] = useState<MarketplaceMCP | null>(null);
   const [stats, setStats] = useState<any>(null);
   const { toast } = useToast();
+
+  // Upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadMetadata, setUploadMetadata] = useState({
+    name: '',
+    category: 'utilities',
+    website_url: '',
+    documentation_url: '',
+  });
 
   // Form state for new/edit MCP
   const [formData, setFormData] = useState({
@@ -266,6 +283,87 @@ export default function AdminMCPs() {
     });
   };
 
+  // Upload handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.zip')) {
+      setUploadFile(file);
+      // Auto-fill name from filename
+      const name = file.name.replace('.zip', '').replace(/-/g, ' ').replace(/_/g, ' ');
+      setUploadMetadata(prev => ({ ...prev, name: name.charAt(0).toUpperCase() + name.slice(1) }));
+    } else {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload a ZIP file',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.name.endsWith('.zip')) {
+      setUploadFile(file);
+      // Auto-fill name from filename
+      const name = file.name.replace('.zip', '').replace(/-/g, ' ').replace(/_/g, ' ');
+      setUploadMetadata(prev => ({ ...prev, name: name.charAt(0).toUpperCase() + name.slice(1) }));
+    }
+  }, []);
+
+  const resetUpload = () => {
+    setUploadFile(null);
+    setUploadMetadata({
+      name: '',
+      category: 'utilities',
+      website_url: '',
+      documentation_url: '',
+    });
+    setShowUploadMCP(false);
+  };
+
+  const handleUploadMCP = async () => {
+    if (!uploadFile) return;
+
+    setUploadLoading(true);
+    try {
+      const result = await api.marketplace.upload(uploadFile, {
+        name: uploadMetadata.name || undefined,
+        category: uploadMetadata.category,
+        website_url: uploadMetadata.website_url || undefined,
+        documentation_url: uploadMetadata.documentation_url || undefined,
+      });
+
+      toast({
+        title: 'MCP uploaded successfully',
+        description: `${result.listing.name} has been added. Found ${result.metadata.tools_count} tools and ${result.metadata.required_secrets.length} required secrets.`,
+      });
+
+      resetUpload();
+      loadMCPs();
+      loadStats();
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   const pendingCount = mcps.filter(m => m.status === 'pending').length;
 
   if (loading) {
@@ -363,13 +461,18 @@ export default function AdminMCPs() {
             </SelectContent>
           </Select>
         </div>
-        <Dialog open={showAddMCP} onOpenChange={setShowAddMCP}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add MCP
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowUploadMCP(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Upload ZIP
+          </Button>
+          <Dialog open={showAddMCP} onOpenChange={setShowAddMCP}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add MCP
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Add New MCP Server</DialogTitle>
@@ -517,7 +620,147 @@ export default function AdminMCPs() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Upload MCP Dialog */}
+      <Dialog open={showUploadMCP} onOpenChange={resetUpload}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileArchive className="h-5 w-5" />
+              Upload MCP Server
+            </DialogTitle>
+            <DialogDescription>
+              Upload a ZIP file containing an MCP server implementation (server.py required)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Dropzone */}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDragging
+                  ? 'border-primary bg-primary/5'
+                  : uploadFile
+                  ? 'border-green-500 bg-green-500/5'
+                  : 'border-muted-foreground/25 hover:border-primary/50'
+              }`}
+            >
+              {uploadFile ? (
+                <div className="flex items-center justify-center gap-3">
+                  <FileArchive className="h-10 w-10 text-green-500" />
+                  <div className="text-left">
+                    <p className="font-medium">{uploadFile.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(uploadFile.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setUploadFile(null)}
+                    className="ml-2"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Drag and drop a ZIP file here, or
+                  </p>
+                  <label className="cursor-pointer">
+                    <span className="text-primary hover:underline">browse</span>
+                    <input
+                      type="file"
+                      accept=".zip"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Metadata Override Fields */}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Name (optional override)</Label>
+                <Input
+                  placeholder="Auto-detected from server.py"
+                  value={uploadMetadata.name}
+                  onChange={(e) => setUploadMetadata({ ...uploadMetadata, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select
+                  value={uploadMetadata.category}
+                  onValueChange={(val) => setUploadMetadata({ ...uploadMetadata, category: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1">
+                  <Globe className="h-3 w-3" />
+                  Website URL (for favicon)
+                </Label>
+                <Input
+                  placeholder="https://example.com"
+                  value={uploadMetadata.website_url}
+                  onChange={(e) => setUploadMetadata({ ...uploadMetadata, website_url: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  Documentation URL
+                </Label>
+                <Input
+                  placeholder="https://docs.example.com"
+                  value={uploadMetadata.documentation_url}
+                  onChange={(e) => setUploadMetadata({ ...uploadMetadata, documentation_url: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={resetUpload}>Cancel</Button>
+            <Button onClick={handleUploadMCP} disabled={!uploadFile || uploadLoading}>
+              {uploadLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload & Register
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* MCPs Table */}
       <Card>

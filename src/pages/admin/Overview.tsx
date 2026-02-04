@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Users,
   Server,
@@ -7,7 +7,9 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +25,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { api } from '@/lib/api';
+import { api, HealthStatus } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminOverview() {
@@ -32,10 +34,39 @@ export default function AdminOverview() {
   const [overview, setOverview] = useState<any>(null);
   const [usageTrends, setUsageTrends] = useState<any[]>([]);
   const [revenue, setRevenue] = useState<any>(null);
+  const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [lastHealthCheck, setLastHealthCheck] = useState<Date | null>(null);
+
+  // Poll health status every 30 seconds
+  const checkHealth = useCallback(async () => {
+    try {
+      setHealthLoading(true);
+      const status = await api.health.getStatus();
+      setHealthStatus(status);
+      setLastHealthCheck(new Date());
+    } catch (error) {
+      console.error('Health check failed:', error);
+      setHealthStatus({
+        status: 'degraded',
+        timestamp: new Date().toISOString(),
+        database: 'unreachable',
+        servers_active: 0
+      });
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadData();
-  }, []);
+    checkHealth();
+
+    // Set up health polling interval (30 seconds)
+    const healthInterval = setInterval(checkHealth, 30000);
+
+    return () => clearInterval(healthInterval);
+  }, [checkHealth]);
 
   const loadData = async () => {
     try {
@@ -266,29 +297,95 @@ export default function AdminOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* System Status */}
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-            <CardDescription>Current platform metrics</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>System Status</CardTitle>
+              <CardDescription>
+                {lastHealthCheck ? (
+                  <>Last checked: {lastHealthCheck.toLocaleTimeString()}</>
+                ) : (
+                  'Loading health status...'
+                )}
+              </CardDescription>
+            </div>
+            <button
+              onClick={checkHealth}
+              disabled={healthLoading}
+              className="p-2 rounded-md hover:bg-muted transition-colors disabled:opacity-50"
+              title="Refresh health status"
+            >
+              <RefreshCw className={`h-4 w-4 ${healthLoading ? 'animate-spin' : ''}`} />
+            </button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* API Gateway Status - Live from /health */}
               <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                <div className="p-2 rounded-full bg-green-500/10 text-green-500">
-                  <CheckCircle className="h-4 w-4" />
+                <div className={`p-2 rounded-full ${
+                  healthStatus?.status === 'healthy'
+                    ? 'bg-green-500/10 text-green-500'
+                    : healthStatus?.status === 'degraded'
+                    ? 'bg-yellow-500/10 text-yellow-500'
+                    : 'bg-red-500/10 text-red-500'
+                }`}>
+                  {healthStatus?.status === 'healthy' ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : healthStatus?.status === 'degraded' ? (
+                    <AlertTriangle className="h-4 w-4" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">API Gateway Operational</p>
-                  <p className="text-xs text-muted-foreground">All services running normally</p>
+                  <p className="text-sm font-medium">
+                    API Gateway {healthStatus?.status === 'healthy' ? 'Operational' : healthStatus?.status === 'degraded' ? 'Degraded' : 'Unknown'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {healthStatus ? (
+                      healthStatus.database === 'healthy'
+                        ? 'All services running normally'
+                        : `Database: ${healthStatus.database}`
+                    ) : 'Checking status...'}
+                  </p>
                 </div>
-                <Badge variant="default">Healthy</Badge>
+                <Badge variant={healthStatus?.status === 'healthy' ? 'default' : healthStatus?.status === 'degraded' ? 'secondary' : 'destructive'}>
+                  {healthStatus?.status === 'healthy' ? 'Healthy' : healthStatus?.status === 'degraded' ? 'Degraded' : 'Unknown'}
+                </Badge>
               </div>
 
+              {/* Database Status - Live from /health */}
+              <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+                <div className={`p-2 rounded-full ${
+                  healthStatus?.database === 'healthy'
+                    ? 'bg-green-500/10 text-green-500'
+                    : 'bg-red-500/10 text-red-500'
+                }`}>
+                  {healthStatus?.database === 'healthy' ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Database Connection</p>
+                  <p className="text-xs text-muted-foreground">
+                    {healthStatus?.database === 'healthy'
+                      ? 'Supabase PostgreSQL connected'
+                      : healthStatus?.database || 'Checking...'}
+                  </p>
+                </div>
+                <Badge variant={healthStatus?.database === 'healthy' ? 'default' : 'destructive'}>
+                  {healthStatus?.database === 'healthy' ? 'Connected' : 'Error'}
+                </Badge>
+              </div>
+
+              {/* Active Servers - from /health */}
               <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
                 <div className="p-2 rounded-full bg-blue-500/10 text-blue-500">
                   <Server className="h-4 w-4" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{overview?.servers?.active || 0} Active MCP Servers</p>
+                  <p className="text-sm font-medium">{healthStatus?.servers_active ?? overview?.servers?.active ?? 0} Active MCP Servers</p>
                   <p className="text-xs text-muted-foreground">{overview?.servers?.total || 0} total deployed</p>
                 </div>
                 <Badge variant="outline">Active</Badge>
