@@ -11,7 +11,9 @@ import {
   RefreshCw,
   Sun,
   Moon,
-  Loader2
+  Loader2,
+  User,
+  Lock
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,7 +36,7 @@ import {
 } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, storage } from '@/lib/api';
 
 // Theme is managed via document.documentElement class toggle
 interface SettingsState {
@@ -104,12 +106,43 @@ export default function AdminSettings() {
   const [integrations, setIntegrations] = useState<Array<{ name: string; type: string; status: string; deployed_count: number }>>([]);
   const [dbMetrics, setDbMetrics] = useState<{ teams: number; servers: number; users: number; activity_logs: number } | null>(null);
 
-  // Load settings on mount
+  // Account settings state
+  const [adminEmail, setAdminEmail] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingAccount, setSavingAccount] = useState(false);
+
+  // Lazy loading state - track which tabs have loaded their data
+  const [activeTab, setActiveTab] = useState('general');
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(['general', 'account', 'security', 'email']));
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
+
+  // Load essential settings on mount (fast - just settings + admin info)
   useEffect(() => {
-    loadSettings();
-    loadIntegrations();
-    loadDbMetrics();
+    Promise.all([loadSettings(), loadAdminInfo()]);
   }, []);
+
+  // Lazy load tab data when tab changes
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (loadedTabs.has(tab)) return;
+
+    // Mark tab as loaded
+    setLoadedTabs(prev => new Set([...prev, tab]));
+
+    // Load data for specific tabs
+    if (tab === 'integrations') {
+      setIntegrationsLoading(true);
+      loadIntegrations().finally(() => setIntegrationsLoading(false));
+    } else if (tab === 'maintenance') {
+      setMaintenanceLoading(true);
+      loadDbMetrics().finally(() => setMaintenanceLoading(false));
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -183,6 +216,76 @@ export default function AdminSettings() {
       });
     } catch (error: any) {
       console.error('Failed to load database metrics:', error);
+    }
+  };
+
+  const loadAdminInfo = async () => {
+    try {
+      const admin = await api.auth.getCurrentUser();
+      setAdminEmail(admin.email);
+      setNewEmail(admin.email);
+    } catch (error: any) {
+      console.error('Failed to load admin info:', error);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    if (!emailPassword) {
+      toast.error('Please enter your current password');
+      return;
+    }
+    if (newEmail === adminEmail) {
+      toast.error('New email is the same as current email');
+      return;
+    }
+    if (!newEmail.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    setSavingAccount(true);
+    try {
+      await api.admins.updateEmail(newEmail, emailPassword);
+      setAdminEmail(newEmail);
+      setEmailPassword('');
+      // Update local storage with new email
+      const currentUser = storage.getAdminUser();
+      if (currentUser) {
+        storage.setAdminUser({ ...currentUser, email: newEmail });
+      }
+      toast.success('Email updated successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update email');
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!currentPassword) {
+      toast.error('Please enter your current password');
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setSavingAccount(true);
+    try {
+      await api.admins.updatePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Password updated successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update password');
+    } finally {
+      setSavingAccount(false);
     }
   };
 
@@ -269,14 +372,125 @@ export default function AdminSettings() {
         </AlertDescription>
       </Alert>
 
-      <Tabs defaultValue="general" className="space-y-6">
+      <Tabs defaultValue="general" value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList>
+          <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="email">Email</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="account" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Account Settings
+              </CardTitle>
+              <CardDescription>Update your email address and password</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Email Change Section */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  <h3 className="font-medium">Change Email Address</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>New Email Address</Label>
+                    <Input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="Enter new email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Current Password</Label>
+                    <Input
+                      type="password"
+                      value={emailPassword}
+                      onChange={(e) => setEmailPassword(e.target.value)}
+                      placeholder="Confirm with password"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={handleUpdateEmail}
+                  disabled={savingAccount || newEmail === adminEmail || !emailPassword}
+                >
+                  {savingAccount ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Update Email
+                </Button>
+              </div>
+
+              {/* Password Change Section */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  <h3 className="font-medium">Change Password</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Current Password</Label>
+                    <Input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Current password"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>New Password</Label>
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Min. 8 characters"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Confirm New Password</Label>
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm password"
+                    />
+                  </div>
+                </div>
+                {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                  <p className="text-sm text-destructive">Passwords do not match</p>
+                )}
+                <Button
+                  onClick={handleUpdatePassword}
+                  disabled={savingAccount || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}
+                >
+                  {savingAccount ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Update Password
+                </Button>
+              </div>
+
+              {/* Current Admin Info */}
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Logged in as: <span className="font-medium text-foreground">{adminEmail}</span>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="general" className="space-y-6">
           <Card>
@@ -315,12 +529,15 @@ export default function AdminSettings() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Default Region</Label>
+                  <div className="flex items-center gap-2">
+                    <Label>Default Region</Label>
+                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                  </div>
                   <Select
                     value={settings.general.default_region}
-                    onValueChange={(value) => updateGeneral('default_region', value)}
+                    disabled
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="opacity-60">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -331,14 +548,18 @@ export default function AdminSettings() {
                       <SelectItem value="ap-southeast-1">Asia Pacific (Singapore)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">Multi-region support coming in a future update</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Default Timezone</Label>
+                  <div className="flex items-center gap-2">
+                    <Label>Default Timezone</Label>
+                    <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                  </div>
                   <Select
                     value={settings.general.default_timezone}
-                    onValueChange={(value) => updateGeneral('default_timezone', value)}
+                    disabled
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="opacity-60">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -349,6 +570,7 @@ export default function AdminSettings() {
                       <SelectItem value="Europe/London">London</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">Timezone preferences coming soon</p>
                 </div>
               </div>
 
@@ -588,8 +810,13 @@ export default function AdminSettings() {
               <CardDescription>Available MCP categories and connection status</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {integrations.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">Loading integrations...</p>
+              {integrationsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading integrations...</span>
+                </div>
+              ) : integrations.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No integrations available</p>
               ) : (
                 integrations.map((integration) => (
                   <div key={integration.name} className="flex items-center justify-between p-4 border rounded-lg">
@@ -626,40 +853,49 @@ export default function AdminSettings() {
               <CardDescription>Data management and backups</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold">{dbMetrics?.teams ?? '-'}</p>
-                    <p className="text-sm text-muted-foreground">Teams</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold">{dbMetrics?.users ?? '-'}</p>
-                    <p className="text-sm text-muted-foreground">Users</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold">{dbMetrics?.servers ?? '-'}</p>
-                    <p className="text-sm text-muted-foreground">Servers</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold">{dbMetrics?.activity_logs?.toLocaleString() ?? '-'}</p>
-                    <p className="text-sm text-muted-foreground">Logs (24h)</p>
-                  </CardContent>
-                </Card>
-              </div>
+              {maintenanceLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-muted-foreground">Loading database metrics...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold">{dbMetrics?.teams ?? '-'}</p>
+                        <p className="text-sm text-muted-foreground">Teams</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold">{dbMetrics?.users ?? '-'}</p>
+                        <p className="text-sm text-muted-foreground">Users</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold">{dbMetrics?.servers ?? '-'}</p>
+                        <p className="text-sm text-muted-foreground">Servers</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold">{dbMetrics?.activity_logs?.toLocaleString() ?? '-'}</p>
+                        <p className="text-sm text-muted-foreground">Logs (24h)</p>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Run Backup Now
-                </Button>
-                <Button variant="outline">Download Latest Backup</Button>
-              </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Run Backup Now
+                    </Button>
+                    <Button variant="outline">Download Latest Backup</Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
