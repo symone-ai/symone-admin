@@ -13,7 +13,9 @@ import {
   Bell,
   LogOut,
   ChevronDown,
-  Activity
+  Activity,
+  UserCog,
+  Flag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,6 +37,8 @@ const navItems = [
   { icon: CreditCard, label: 'Plans', path: '/admin/plans' },
   { icon: Server, label: 'MCP Marketplace', path: '/admin/mcps' },
   { icon: Activity, label: 'Activity Logs', path: '/admin/activity' },
+  { icon: Flag, label: 'Feature Flags', path: '/admin/feature-flags' },
+  { icon: UserCog, label: 'Admin Users', path: '/admin/admins' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
 

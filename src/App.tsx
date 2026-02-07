@@ -12,6 +12,8 @@ import AdminMCPs from "./pages/admin/MCPs";
 import AdminActivity from "./pages/admin/Activity";
 import AdminAnalytics from "./pages/admin/Analytics";
 import AdminSettings from "./pages/admin/Settings";
+import AdminAdmins from "./pages/admin/Admins";
+import AdminFeatureFlags from "./pages/admin/FeatureFlags";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +37,8 @@ const AppAdmin = () => (
                         <Route path="/admin/activity" element={<AdminLayout><AdminActivity /></AdminLayout>} />
                         <Route path="/admin/analytics" element={<AdminLayout><AdminAnalytics /></AdminLayout>} />
                         <Route path="/admin/settings" element={<AdminLayout><AdminSettings /></AdminLayout>} />
+                        <Route path="/admin/admins" element={<AdminLayout><AdminAdmins /></AdminLayout>} />
+                        <Route path="/admin/feature-flags" element={<AdminLayout><AdminFeatureFlags /></AdminLayout>} />
                     </Route>
 
                     <Route path="*" element={<NotFound />} />

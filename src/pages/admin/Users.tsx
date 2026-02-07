@@ -15,7 +15,11 @@ import {
   User,
   Loader2,
   UserMinus,
-  UserPlus
+  UserPlus,
+  RotateCcw,
+  Shield,
+  Bell,
+  Server
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -70,6 +74,7 @@ import {
 } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
 import { api, type Team, type PlatformUser, type TeamMember, type Plan } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -868,81 +873,166 @@ export default function AdminUsers() {
 
       {/* Edit Team Dialog */}
       <Dialog open={!!editingTeam} onOpenChange={() => setEditingTeam(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Team</DialogTitle>
-            <DialogDescription>Update team settings and quota</DialogDescription>
+            <DialogDescription>Update team settings, plan, and quota</DialogDescription>
           </DialogHeader>
-          {editingTeam && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Team Name</Label>
-                <Input
-                  value={editingTeam.name}
-                  onChange={(e) => setEditingTeam({ ...editingTeam, name: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+          {editingTeam && (() => {
+            const teamPlan = plans.find(p => p.slug === editingTeam.plan);
+            const memberCount = editingTeam.member_count ?? 0;
+            const memberLimit = teamPlan?.member_limit;
+            const workspaceLimit = teamPlan?.workspace_limit;
+            const usagePercent = editingTeam.quota_limit
+              ? Math.round(((editingTeam.usage_count ?? 0) / editingTeam.quota_limit) * 100)
+              : 0;
+
+            return (
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Plan</Label>
-                  <Select
-                    value={editingTeam.plan}
-                    onValueChange={(plan) => setEditingTeam({
-                      ...editingTeam,
-                      plan: plan as any,
-                      quota_limit: getPlanQuota(plan)
-                    })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plans.map(plan => (
-                        <SelectItem key={plan.id} value={plan.slug}>{plan.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Team Name</Label>
+                  <Input
+                    value={editingTeam.name}
+                    onChange={(e) => setEditingTeam({ ...editingTeam, name: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Plan</Label>
+                    <Select
+                      value={editingTeam.plan}
+                      onValueChange={(plan) => setEditingTeam({
+                        ...editingTeam,
+                        plan: plan as any,
+                        quota_limit: getPlanQuota(plan)
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plans.map(plan => (
+                          <SelectItem key={plan.id} value={plan.slug}>{plan.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={editingTeam.active ? 'active' : 'inactive'}
+                      onValueChange={(status) => setEditingTeam({ ...editingTeam, active: status === 'active' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={editingTeam.active ? 'active' : 'inactive'}
-                    onValueChange={(status) => setEditingTeam({ ...editingTeam, active: status === 'active' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>Monthly Quota</Label>
+                  <Input
+                    type="number"
+                    value={editingTeam.quota_limit}
+                    onChange={(e) => setEditingTeam({ ...editingTeam, quota_limit: parseInt(e.target.value) })}
+                  />
                 </div>
+
+                {/* Usage & Quota Stats */}
+                <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">API Usage</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        try {
+                          await api.teams.resetUsage(editingTeam.id);
+                          toast({ title: 'Usage reset', description: `Usage counter for ${editingTeam.name} has been reset to 0` });
+                          setEditingTeam({ ...editingTeam, usage_count: 0 });
+                          loadTeams();
+                        } catch (error: any) {
+                          toast({ title: 'Error resetting usage', description: error.message, variant: 'destructive' });
+                        }
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset Usage
+                    </Button>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>{(editingTeam.usage_count ?? 0).toLocaleString()} / {(editingTeam.quota_limit ?? 0).toLocaleString()} calls</span>
+                      <span className={usagePercent >= 90 ? 'text-red-500 font-medium' : usagePercent >= 70 ? 'text-yellow-500' : 'text-muted-foreground'}>
+                        {usagePercent}%
+                      </span>
+                    </div>
+                    <Progress value={Math.min(usagePercent, 100)} className="h-2" />
+                  </div>
+                </div>
+
+                {/* Plan Limits Display */}
+                {teamPlan && (
+                  <div className="space-y-3 p-4 border rounded-lg">
+                    <h4 className="font-medium text-sm">Plan Limits ({teamPlan.name})</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span>Members:</span>
+                        <span className="font-medium">
+                          {memberCount}{memberLimit != null ? ` / ${memberLimit}` : ' / Unlimited'}
+                        </span>
+                        {memberLimit != null && memberCount >= memberLimit && (
+                          <Badge variant="destructive" className="text-[10px] px-1 py-0">At limit</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span>Workspaces:</span>
+                        <span className="font-medium">
+                          {workspaceLimit != null ? workspaceLimit : 'Unlimited'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Server className="h-4 w-4 text-muted-foreground" />
+                        <span>Servers:</span>
+                        <span className="font-medium">
+                          {teamPlan.server_providers?.join(', ') || 'community'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                        <span>Log Retention:</span>
+                        <span className="font-medium">{teamPlan.log_retention_days}d</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      {teamPlan.request_tracing && (
+                        <Badge variant="outline" className="text-xs">
+                          <Shield className="h-3 w-3 mr-1" />Tracing
+                        </Badge>
+                      )}
+                      {teamPlan.webhooks && (
+                        <Badge variant="outline" className="text-xs">
+                          <Bell className="h-3 w-3 mr-1" />Webhooks
+                        </Badge>
+                      )}
+                      {teamPlan.server_providers?.includes('official') && (
+                        <Badge variant="outline" className="text-xs">
+                          <Server className="h-3 w-3 mr-1" />Official MCPs
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label>Monthly Quota</Label>
-                <Input
-                  type="number"
-                  value={editingTeam.quota_limit}
-                  onChange={(e) => setEditingTeam({ ...editingTeam, quota_limit: parseInt(e.target.value) })}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{editingTeam.usage_count.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">Current Usage</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{editingTeam.quota_limit.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">Quota Limit</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{Math.round((editingTeam.usage_count / editingTeam.quota_limit) * 100)}%</p>
-                  <p className="text-sm text-muted-foreground">Used</p>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingTeam(null)}>Cancel</Button>
             <Button onClick={updateTeam}>Save Changes</Button>

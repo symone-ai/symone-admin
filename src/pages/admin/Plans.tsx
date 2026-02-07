@@ -37,6 +37,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -53,6 +60,130 @@ interface PlanWithMetrics extends Plan {
   mrr?: number;
 }
 
+const DEFAULT_NEW_PLAN = {
+  name: '',
+  slug: '',
+  description: '',
+  price_monthly: 0,
+  price_yearly: 0,
+  quota_limit: 500,
+  features: [] as string[],
+  is_active: true,
+  is_featured: false,
+  member_limit: 1 as number | null,
+  workspace_limit: 1 as number | null,
+  log_retention_days: 1,
+  request_tracing: false,
+  webhooks: false,
+  server_providers: ['community'] as string[],
+};
+
+// Reusable limit fields for both create and edit dialogs
+function PlanLimitFields({
+  plan,
+  onChange,
+}: {
+  plan: {
+    member_limit: number | null;
+    workspace_limit: number | null;
+    log_retention_days: number;
+    request_tracing: boolean;
+    webhooks: boolean;
+    server_providers: string[];
+  };
+  onChange: (updates: Partial<typeof plan>) => void;
+}) {
+  return (
+    <>
+      <div className="pt-2 border-t border-border">
+        <p className="text-sm font-medium mb-3">Plan Limits</p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label>Max Members</Label>
+          <Input
+            type="number"
+            placeholder="Unlimited"
+            value={plan.member_limit ?? ''}
+            onChange={(e) => onChange({
+              member_limit: e.target.value === '' ? null : parseInt(e.target.value) || 1
+            })}
+          />
+          <p className="text-xs text-muted-foreground">Empty = unlimited</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Max Workspaces</Label>
+          <Input
+            type="number"
+            placeholder="Unlimited"
+            value={plan.workspace_limit ?? ''}
+            onChange={(e) => onChange({
+              workspace_limit: e.target.value === '' ? null : parseInt(e.target.value) || 1
+            })}
+          />
+          <p className="text-xs text-muted-foreground">Empty = unlimited</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Log Retention (days)</Label>
+          <Select
+            value={String(plan.log_retention_days)}
+            onValueChange={(v) => onChange({ log_retention_days: parseInt(v) })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 day (24h)</SelectItem>
+              <SelectItem value="7">7 days</SelectItem>
+              <SelectItem value="30">30 days</SelectItem>
+              <SelectItem value="90">90 days</SelectItem>
+              <SelectItem value="365">365 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Server Providers Allowed</Label>
+        <div className="flex gap-4">
+          {['community', 'official', 'partner'].map((provider) => (
+            <div key={provider} className="flex items-center gap-2">
+              <Switch
+                checked={plan.server_providers.includes(provider)}
+                onCheckedChange={(checked) => {
+                  const providers = checked
+                    ? [...plan.server_providers, provider]
+                    : plan.server_providers.filter(p => p !== provider);
+                  onChange({ server_providers: providers.length > 0 ? providers : ['community'] });
+                }}
+              />
+              <Label className="capitalize">{provider}</Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={plan.request_tracing}
+            onCheckedChange={(checked) => onChange({ request_tracing: checked })}
+          />
+          <Label>Request Tracing</Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={plan.webhooks}
+            onCheckedChange={(checked) => onChange({ webhooks: checked })}
+          />
+          <Label>Webhook Alerts</Label>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function AdminPlans() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -60,17 +191,7 @@ export default function AdminPlans() {
   const [editingPlan, setEditingPlan] = useState<PlanWithMetrics | null>(null);
   const [creatingPlan, setCreatingPlan] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState<{id: string, name: string} | null>(null);
-  const [newPlan, setNewPlan] = useState({
-    name: '',
-    slug: '',
-    description: '',
-    price_monthly: 0,
-    price_yearly: 0,
-    quota_limit: 500,
-    features: [] as string[],
-    is_active: true,
-    is_featured: false
-  });
+  const [newPlan, setNewPlan] = useState({ ...DEFAULT_NEW_PLAN });
 
   useEffect(() => {
     loadPlans();
@@ -109,17 +230,7 @@ export default function AdminPlans() {
         description: `${newPlan.name} has been created successfully`
       });
       setCreatingPlan(false);
-      setNewPlan({
-        name: '',
-        slug: '',
-        description: '',
-        price_monthly: 0,
-        price_yearly: 0,
-        quota_limit: 500,
-        features: [],
-        is_active: true,
-        is_featured: false
-      });
+      setNewPlan({ ...DEFAULT_NEW_PLAN });
       loadPlans();
     } catch (error: any) {
       toast({
@@ -142,7 +253,13 @@ export default function AdminPlans() {
         quota_limit: editingPlan.quota_limit,
         features: editingPlan.features,
         is_active: editingPlan.is_active,
-        is_featured: editingPlan.is_featured
+        is_featured: editingPlan.is_featured,
+        member_limit: editingPlan.member_limit,
+        workspace_limit: editingPlan.workspace_limit,
+        log_retention_days: editingPlan.log_retention_days,
+        request_tracing: editingPlan.request_tracing,
+        webhooks: editingPlan.webhooks,
+        server_providers: editingPlan.server_providers,
       });
       toast({
         title: 'Plan updated',
@@ -252,7 +369,7 @@ export default function AdminPlans() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Subscription Plans</CardTitle>
-            <CardDescription>Manage pricing plans and features</CardDescription>
+            <CardDescription>Manage pricing plans, features, and enforcement limits</CardDescription>
           </div>
           <Button onClick={() => setCreatingPlan(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -315,6 +432,23 @@ export default function AdminPlans() {
                       <span className="text-muted-foreground">Quota</span>
                       <span className="font-medium">{plan.quota_limit.toLocaleString()} calls/mo</span>
                     </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Members</span>
+                      <span className="font-medium">{plan.member_limit ?? 'Unlimited'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Workspaces</span>
+                      <span className="font-medium">{plan.workspace_limit ?? 'Unlimited'}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Log Retention</span>
+                      <span className="font-medium">{plan.log_retention_days}d</span>
+                    </div>
+                    <div className="flex gap-1 pt-1">
+                      {plan.request_tracing && <Badge variant="outline" className="text-xs">Tracing</Badge>}
+                      {plan.webhooks && <Badge variant="outline" className="text-xs">Webhooks</Badge>}
+                      {plan.server_providers?.includes('official') && <Badge variant="outline" className="text-xs">Official MCPs</Badge>}
+                    </div>
                     {plan.price_yearly > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Yearly</span>
@@ -331,7 +465,7 @@ export default function AdminPlans() {
 
       {/* Create Plan Dialog */}
       <Dialog open={creatingPlan} onOpenChange={setCreatingPlan}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Plan</DialogTitle>
             <DialogDescription>Add a new subscription plan to the platform</DialogDescription>
@@ -403,6 +537,11 @@ export default function AdminPlans() {
               />
             </div>
 
+            <PlanLimitFields
+              plan={newPlan}
+              onChange={(updates) => setNewPlan({ ...newPlan, ...updates })}
+            />
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Switch
@@ -429,10 +568,10 @@ export default function AdminPlans() {
 
       {/* Edit Plan Dialog */}
       <Dialog open={!!editingPlan} onOpenChange={() => setEditingPlan(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Plan: {editingPlan?.name}</DialogTitle>
-            <DialogDescription>Update plan details, pricing, and limits</DialogDescription>
+            <DialogDescription>Update plan details, pricing, and enforcement limits</DialogDescription>
           </DialogHeader>
           {editingPlan && (
             <div className="space-y-4">
@@ -494,6 +633,18 @@ export default function AdminPlans() {
                   onChange={(e) => setEditingPlan({ ...editingPlan, features: e.target.value.split(',').map(f => f.trim()).filter(f => f) })}
                 />
               </div>
+
+              <PlanLimitFields
+                plan={{
+                  member_limit: editingPlan.member_limit,
+                  workspace_limit: editingPlan.workspace_limit,
+                  log_retention_days: editingPlan.log_retention_days ?? 1,
+                  request_tracing: editingPlan.request_tracing ?? false,
+                  webhooks: editingPlan.webhooks ?? false,
+                  server_providers: editingPlan.server_providers ?? ['community'],
+                }}
+                onChange={(updates) => setEditingPlan({ ...editingPlan, ...updates })}
+              />
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

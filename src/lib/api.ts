@@ -166,6 +166,10 @@ async function request<T>(
       }
     }
 
+    if (response.status === 503) {
+      window.dispatchEvent(new CustomEvent('maintenance_mode_active'));
+    }
+
     throw new ApiError(
       response.status,
       data.detail || data.message || 'Request failed',
@@ -646,6 +650,14 @@ export const teams = {
       deleted_users?: Array<{ user_id: string; email: string }>;
     }>(`/admin/teams/${teamId}?${query}`, { method: 'DELETE' });
     return response;
+  },
+
+  resetUsage: async (teamId: string) => {
+    const response = await request<{ success: boolean; message: string }>(
+      `/admin/teams/${teamId}/reset-usage`,
+      { method: 'POST' }
+    );
+    return response;
   }
 };
 
@@ -701,6 +713,42 @@ export const admins = {
       body: JSON.stringify(data),
     });
     return response.admin;
+  },
+
+  updatePassword: async (currentPassword: string, newPassword: string) => {
+    const response = await request<{ success: boolean; message: string }>('/admin/me/password', {
+      method: 'PUT',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+    return response;
+  },
+
+  updateEmail: async (newEmail: string, currentPassword: string) => {
+    const response = await request<{ success: boolean; email: string; message: string }>('/admin/me/email', {
+      method: 'PUT',
+      body: JSON.stringify({
+        new_email: newEmail,
+        current_password: currentPassword,
+      }),
+    });
+    return response;
+  },
+
+  updateRole: async (adminId: string, role: string) => {
+    const response = await request<{ success: boolean; admin: AdminUser }>(`/admin/admins/${adminId}/role?role=${role}`, {
+      method: 'PUT',
+    });
+    return response.admin;
+  },
+
+  deactivate: async (adminId: string) => {
+    const response = await request<{ success: boolean; message: string }>(`/admin/admins/${adminId}`, {
+      method: 'DELETE',
+    });
+    return response;
   }
 };
 
@@ -720,6 +768,12 @@ export interface Plan {
   is_active: boolean;
   is_featured: boolean;
   display_order: number;
+  member_limit: number | null;
+  workspace_limit: number | null;
+  log_retention_days: number;
+  request_tracing: boolean;
+  webhooks: boolean;
+  server_providers: string[];
   created_at: string;
   updated_at: string;
 }
@@ -1282,6 +1336,49 @@ export const health = {
 };
 
 // ============================================================================
+// Feature Flags
+// ============================================================================
+
+export interface FeatureFlag {
+  id: string;
+  flag_name: string;
+  enabled: boolean;
+  description: string;
+  rollout_percent: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const featureFlags = {
+  list: async (): Promise<FeatureFlag[]> => {
+    const response = await request<{ success: boolean; flags: FeatureFlag[]; total: number }>('/admin/feature-flags');
+    return response.flags;
+  },
+
+  create: async (data: { flag_name: string; description?: string; enabled?: boolean; rollout_percent?: number }): Promise<FeatureFlag> => {
+    const response = await request<{ success: boolean; flag: FeatureFlag }>('/admin/feature-flags', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return response.flag;
+  },
+
+  update: async (flagId: string, data: { enabled?: boolean; description?: string; rollout_percent?: number }): Promise<FeatureFlag> => {
+    const response = await request<{ success: boolean; flag: FeatureFlag }>(`/admin/feature-flags/${flagId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return response.flag;
+  },
+
+  delete: async (flagId: string): Promise<void> => {
+    await request<{ success: boolean }>(`/admin/feature-flags/${flagId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ============================================================================
 // Export all
 // ============================================================================
 
@@ -1298,6 +1395,7 @@ export const api = {
   public: publicApi,
   user,
   health,
+  featureFlags,
 };
 
 export default api;
