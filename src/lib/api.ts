@@ -842,6 +842,7 @@ export interface MarketplaceMCP {
   status: 'planned' | 'active' | 'pending' | 'rejected' | 'deprecated';
   version: string;
   icon: string;
+  icon_url?: string;
   install_count: number;
   rating: number;
   is_featured: boolean;

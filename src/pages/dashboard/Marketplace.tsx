@@ -80,6 +80,7 @@ interface MarketplaceServer {
   category: string;
   subcategory: string;
   icon: any; // Simplified for dynamic loading or lucide mapping
+  iconUrl?: string;
   publisher: string;
   serverType: ServerType;
   executionMode: ExecutionMode;
@@ -139,6 +140,7 @@ const Marketplace = () => {
             category: m.category,
             subcategory: m.subcategory || '',
             icon: Brain, // Default icon, would need a mapper for string name -> Component
+            iconUrl: m.icon_url,
             publisher: m.provider === 'official' ? 'Symone' : (m.provider === 'partner' ? 'Official' : 'Marketplace'),
             serverType: (m.provider as ServerType) || 'community',
             executionMode: 'dual-mode', // Placeholder
@@ -667,8 +669,12 @@ const ServerCard = ({
       <Card className="hover:border-primary/30 transition-colors h-full flex flex-col group">
         <CardContent className="p-5 flex-1 flex flex-col">
           <div className="flex items-start justify-between mb-3">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <server.icon className="w-6 h-6 text-primary" />
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden">
+              {server.iconUrl ? (
+                <img src={server.iconUrl} alt={server.name} className="w-full h-full object-contain p-2" />
+              ) : (
+                <server.icon className="w-6 h-6 text-primary" />
+              )}
             </div>
             <div className="flex flex-col items-end gap-1">
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${typeBadge.className}`}>
