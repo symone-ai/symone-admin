@@ -473,153 +473,153 @@ export default function AdminMCPs() {
                 Add MCP
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New MCP Server</DialogTitle>
-              <DialogDescription>Create a new MCP server integration</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add New MCP Server</DialogTitle>
+                <DialogDescription>Create a new MCP server integration</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input
+                      placeholder="PostgreSQL Pro"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Slug</Label>
+                    <Input
+                      placeholder="postgresql-pro"
+                      value={formData.slug}
+                      onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input
-                    placeholder="PostgreSQL Pro"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  <Label>Description</Label>
+                  <Textarea
+                    placeholder="Describe what this MCP does..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Slug</Label>
-                  <Input
-                    placeholder="postgresql-pro"
-                    value={formData.slug}
-                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(val) => setFormData({ ...formData, category: val, subcategory: '' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subcategory</Label>
+                    <Select
+                      value={formData.subcategory}
+                      onValueChange={(val) => setFormData({ ...formData, subcategory: val })}
+                      disabled={!formData.category}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedCategoryData?.subcategories.map(sub => (
+                          <SelectItem key={sub.id} value={sub.id}>
+                            {sub.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Provider Type</Label>
+                    <Select value={formData.provider} onValueChange={(val: any) => setFormData({ ...formData, provider: val })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="official">Symone</SelectItem>
+                        <SelectItem value="partner">Official</SelectItem>
+                        <SelectItem value="community">Marketplace</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={formData.status} onValueChange={(val: any) => setFormData({ ...formData, status: val })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="planned">Planned</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="deprecated">Deprecated</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Version</Label>
+                    <Input
+                      placeholder="1.0.0"
+                      value={formData.version}
+                      onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Icon (emoji)</Label>
+                    <Input
+                      placeholder="🐘"
+                      value={formData.icon}
+                      onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Featured on Marketplace</Label>
+                  <Switch
+                    checked={formData.is_featured}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_featured: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Verified</Label>
+                  <Switch
+                    checked={formData.verified}
+                    onCheckedChange={(checked) => setFormData({ ...formData, verified: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Hosted by Symone</Label>
+                  <Switch
+                    checked={formData.is_hosted_by_symone}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_hosted_by_symone: checked })}
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  placeholder="Describe what this MCP does..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(val) => setFormData({ ...formData, category: val, subcategory: '' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Subcategory</Label>
-                  <Select
-                    value={formData.subcategory}
-                    onValueChange={(val) => setFormData({ ...formData, subcategory: val })}
-                    disabled={!formData.category}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectedCategoryData?.subcategories.map(sub => (
-                        <SelectItem key={sub.id} value={sub.id}>
-                          {sub.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Provider Type</Label>
-                  <Select value={formData.provider} onValueChange={(val: any) => setFormData({ ...formData, provider: val })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="official">Symone</SelectItem>
-                      <SelectItem value="partner">Official</SelectItem>
-                      <SelectItem value="community">Marketplace</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={formData.status} onValueChange={(val: any) => setFormData({ ...formData, status: val })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="planned">Planned</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="deprecated">Deprecated</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Version</Label>
-                  <Input
-                    placeholder="1.0.0"
-                    value={formData.version}
-                    onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Icon (emoji)</Label>
-                  <Input
-                    placeholder="🐘"
-                    value={formData.icon}
-                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Featured on Marketplace</Label>
-                <Switch
-                  checked={formData.is_featured}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_featured: checked })}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Verified</Label>
-                <Switch
-                  checked={formData.verified}
-                  onCheckedChange={(checked) => setFormData({ ...formData, verified: checked })}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Hosted by Symone</Label>
-                <Switch
-                  checked={formData.is_hosted_by_symone}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_hosted_by_symone: checked })}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddMCP(false)}>Cancel</Button>
-              <Button onClick={handleCreateMCP}>Create MCP</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddMCP(false)}>Cancel</Button>
+                <Button onClick={handleCreateMCP}>Create MCP</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -642,13 +642,12 @@ export default function AdminMCPs() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragging
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
                   ? 'border-primary bg-primary/5'
                   : uploadFile
-                  ? 'border-green-500 bg-green-500/5'
-                  : 'border-muted-foreground/25 hover:border-primary/50'
-              }`}
+                    ? 'border-green-500 bg-green-500/5'
+                    : 'border-muted-foreground/25 hover:border-primary/50'
+                }`}
             >
               {uploadFile ? (
                 <div className="flex items-center justify-center gap-3">
@@ -791,7 +790,22 @@ export default function AdminMCPs() {
                   <TableRow key={mcp.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{mcp.icon}</span>
+                        <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center overflow-hidden">
+                          {mcp.icon_url ? (
+                            <img
+                              src={mcp.icon_url}
+                              alt={mcp.name}
+                              className="w-8 h-8 object-contain"
+                              onError={(e) => {
+                                // Fallback to emoji on error
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling as HTMLSpanElement;
+                                if (fallback) fallback.style.display = 'block';
+                              }}
+                            />
+                          ) : null}
+                          <span className={`text-2xl ${mcp.icon_url ? 'hidden' : ''}`}>{mcp.icon}</span>
+                        </div>
                         <div>
                           <p className="font-medium">{mcp.name}</p>
                           <p className="text-xs text-muted-foreground">v{mcp.version}</p>
